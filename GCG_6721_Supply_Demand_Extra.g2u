@@ -1,0 +1,225 @@
+Program.Sub.ScreenSU.Start
+Gui.FormSD..Create
+Gui.FormSD..Caption("Supply & Demand - Alt 2 Descripton and Extra Desription")
+Gui.FormSD..Size(7995,3150)
+Gui.FormSD..MinX(0)
+Gui.FormSD..MinY(0)
+Gui.FormSD..Position(0,0)
+Gui.FormSD..BackColor(-2147483633)
+Gui.FormSD..MousePointer(0)
+Gui.FormSD..Event(UnLoad,FormSD_UnLoad)
+Gui.FormSD.lblAlt.Create(Label,"Alt Description 2",True,1935,255,0,120,210,True,0,"Arial",8,-2147483633,0)
+Gui.FormSD.txtAltDesc.Create(TextBox,"",True,7575,300,0,120,495,True,0,"Arial",8,-2147483643,1)
+Gui.FormSD.txtAltDesc.Locked(True)
+Gui.FormSD.txtAltDesc.Event(KeyPressEnter,cmdUpdate_Click)
+Gui.FormSD.lblExt.Create(Label,"Extra Text",True,1935,255,0,120,945,True,0,"Arial",8,-2147483633,0)
+Gui.FormSD.txtExtraDesc.Create(TextBoxR)
+Gui.FormSD.txtExtraDesc.Size(7575,1290)
+Gui.FormSD.txtExtraDesc.Position(120,1185)
+Gui.FormSD.txtExtraDesc.BorderStyle(1)
+Gui.FormSD.txtExtraDesc.Event(KeyPress,cmdUpdate_Click)
+Gui.FormSD.cmdUpdate.Create(Button)
+Gui.FormSD.cmdUpdate.Size(780,330)
+Gui.FormSD.cmdUpdate.Position(6825,60)
+Gui.FormSD.cmdUpdate.Caption("Update")
+Gui.FormSD.cmdUpdate.Event(Click,cmdUpdate_Click)
+Gui.FormSD.cmdUpdate.Visible(False)
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+V.Global.bOpen.Declare(Boolean,False)
+V.Global.sFile.Declare(String)
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+F.Intrinsic.Control.SetErrorHandler("Main_Err")
+F.Intrinsic.Control.ClearErrors
+	v.Local.sSql.Declare(String)
+	v.Local.sError.Declare(String)
+	V.Local.sPart.Declare(String)
+	v.Local.bUseRevision.Declare(Boolean,False)
+	v.Local.bRet.Declare(Boolean,False)
+	V.Local.sLoc.Declare(String)
+	V.Local.sRet.Declare(String)
+	V.Local.iRet.Declare(Long)
+	V.Local.sHand.Declare(String)
+	V.Local.sGAB.Declare(String)
+	V.Local.dDate.Declare(Date)
+	V.Local.dDate2.Declare(Date)
+	V.Local.iAttempt.Declare(Long)
+	
+	F.Intrinsic.Control.If(V.Caller.LocalGSSTempDir.Right1,=,"\")
+		F.Intrinsic.String.Build("{0}{1}SupDemnd.txt",V.Caller.LocalGSSTempDir,V.Caller.Terminal,V.Global.sFile)
+	F.Intrinsic.Control.Else
+		F.Intrinsic.String.Build("{0}\{1}SupDemnd.txt",V.Caller.LocalGSSTempDir,V.Caller.Terminal,V.Global.sFile)
+	F.Intrinsic.Control.EndIf
+	
+	Gui.FormSD.txtExtraDesc.Locked(True)
+	
+	F.Intrinsic.Control.If(V.Caller.GasDir.Right1,=,"\")
+		F.Intrinsic.String.Build("{0}GCG_6721_Supply_Demand_Extra.g2u",V.Caller.GasDir,V.Local.sGAB)
+	F.Intrinsic.Control.Else
+		F.Intrinsic.String.Build("{0}\GCG_6721_Supply_Demand_Extra.g2u",V.Caller.GasDir,V.Local.sGAB)
+	F.Intrinsic.Control.EndIf
+	
+	F.Intrinsic.Control.If(V.Caller.Hook,=,"52010","AND",V.Caller.Switches.Trim,=,"")
+		'Get whether using Revision Level
+		F.Global.General.ReadOption(70008,0,False,0,v.Local.bUseRevision)
+		
+		V.Local.sLoc.Set(V.Passed.LocationCode.Trim)
+		
+		F.Intrinsic.Control.If(V.Local.bUseRevision)
+			F.Intrinsic.String.RPad(V.Passed.PartNumber," ",17,V.Local.sPart)
+			F.Intrinsic.String.Build("{0}{1}",V.Local.sPart,V.Passed.PartNumberRevision,V.Local.sPart)
+			v.Local.sPart.Set(v.Local.sPart.Trim)
+		F.Intrinsic.Control.Else
+			V.Local.sPart.Set(V.Passed.PartNumber)
+			v.Local.sPart.Set(v.Local.sPart.Trim)
+		F.Intrinsic.Control.EndIf
+			'Open database connection
+		f.ODBC.Connection!con.OpenCompanyConnection(120)
+		V.Global.bOpen.Set(True)
+		
+		F.Intrinsic.String.Build("Select Top 1 Description_3 ,RTRIM(CONVERT(REPLACE(REPLACE(REPLACE(TEXT,Char(10),' '),Char(13),' '),Char(9),' '),SQL_VARCHAR,1000)) AS Extra_Desc From V_Inventory_Mst2 a Left Join V_Inv_Extra_Text b on a.Part = b.Part Where a.Part = '{0}' and a.Location = '{1}'",V.Local.sPart,v.Local.sLoc,V.Local.sSql)
+		F.ODBC.Connection!Con.ExecuteAndReturn(V.Local.sSql,v.Local.sRet)
+
+		F.Intrinsic.Control.If(V.Global.bOpen)
+			F.ODBC.Connection!con.Close
+			V.Global.bOpen.Set(False)
+		F.Intrinsic.Control.EndIf
+		
+		F.Intrinsic.String.Replace(V.Local.sRet,"*!*","|~|",V.Local.sRet)
+		
+		F.Intrinsic.API.GetHandleFromPID(V.Caller.PID,V.Local.sHand)
+		F.Intrinsic.String.Build("{0}|~|{1}",V.Local.sRet,V.Local.sHand,V.Local.sRet)
+
+		F.Intrinsic.Control.If(V.Passed.Global.IsNumeric)
+			F.Intrinsic.Task.PIDRunning(V.Passed.Global,V.Local.bRet)
+			
+			F.Intrinsic.Control.If(V.Local.bRet)
+				F.Intrinsic.File.String2File(V.Global.sFile,V.Local.sRet)
+				F.Intrinsic.Task.AppActivate(V.Passed.Global)
+				F.Intrinsic.Task.SendKeys("~")
+			F.Intrinsic.Control.Else
+				F.Global.General.CallAsyncGAS(V.Local.sGab,V.Local.sRet,V.Local.iRet)
+				V.Passed.Global.Set(V.Local.iRet)
+			F.Intrinsic.Control.EndIf
+		F.Intrinsic.Control.Else
+			F.Global.General.CallAsyncGAS(V.Local.sGab,V.Local.sRet,V.Local.iRet)
+			V.Passed.Global.Set(V.Local.iRet)
+		F.Intrinsic.Control.EndIf
+	F.Intrinsic.Control.ElseIf(V.Caller.Hook,=,"52001")
+		F.Intrinsic.Control.If(V.Passed.Global.IsNumeric)
+			F.Intrinsic.Task.PIDRunning(V.Passed.Global,V.Local.bRet)
+			
+			F.Intrinsic.Control.If(V.Local.bRet)
+				F.Intrinsic.Task.TerminatePID(V.Passed.Global)
+			F.Intrinsic.Control.EndIf
+		F.Intrinsic.Control.EndIf
+		
+	F.Intrinsic.Control.Else
+		F.Intrinsic.Control.If(V.Caller.Switches.Trim,<>,"")
+			F.Intrinsic.String.Split(V.Caller.Switches.Trim,"|~|",V.Local.sRet)
+			gui.FormSD.txtAltDesc.Text(V.Local.sRet(0).Trim)
+			gui.FormSD.txtExtraDesc.Text(V.Local.sRet(1).Trim)
+			
+			Gui.FormSD..Show
+			Gui.FormSD..AlwaysOnTop(True)
+			Gui.FormSD..AlwaysOnTop(False)
+			Gui.FormSD..Moveable(True)
+			
+			F.Intrinsic.File.String2File(V.Global.sFile,V.Caller.Switches)
+			
+'			F.Intrinsic.File.GetFileDateTimeExtended(V.Global.sFile,3,True,V.Local.dDate)
+
+'			V.Local.bRet.Set(True)
+'			
+'			F.Intrinsic.Control.DoUntil(V.Local.bRet,=,False)
+'				F.Intrinsic.File.Exists(V.Global.sFile,V.Local.bRet)
+'				F.Intrinsic.Control.Try
+'					F.Intrinsic.File.GetFileDateTimeExtended(V.Global.sFile,3,True,V.Local.dDate2)
+'					F.Intrinsic.Control.If(V.Local.dDate,<>,V.Local.dDate2)
+'						F.Intrinsic.File.File2String(V.Global.sFile,V.Local.sRet)
+'						F.Intrinsic.String.Split(v.Local.sRet,"|~|",V.Local.sRet)
+'						gui.FormSD.txtAltDesc.Text(V.Local.sRet(0).Trim)
+'						gui.FormSD.txtExtraDesc.Text(V.Local.sRet(1).Trim)
+'						Gui.FormSD..AlwaysOnTop(True)
+'						Gui.FormSD..AlwaysOnTop(False)
+'						V.Local.dDate.Set(V.Local.dDate2)
+'						V.Local.iAttempt.Set(0)
+'					F.Intrinsic.Control.EndIf
+'				F.Intrinsic.Control.Catch
+'					F.Intrinsic.Math.Add(V.Local.iAttempt,1,V.Local.iAttempt)
+'					F.Intrinsic.Control.If(V.Local.iAttempt,>,10)
+'						F.Intrinsic.Control.CallSub(FormSD_UnLoad)
+'					F.Intrinsic.Control.EndIf
+'				F.Intrinsic.Control.EndTry
+'			F.Intrinsic.Control.Loop
+		F.Intrinsic.Control.Else
+			F.Intrinsic.Control.End
+		F.Intrinsic.Control.EndIf
+			
+	F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("Main_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	f.Intrinsic.String.Build("Project: {0}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}GAB Version: {5}}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+	f.Intrinsic.UI.Msgbox(V.Local.sError)
+	f.Intrinsic.Control.If(V.Global.bOpen)
+		f.ODBC.Connection!con.close
+		V.Global.bOpen.Set(False)
+	f.Intrinsic.Control.EndIf
+	f.Intrinsic.Control.End
+f.Intrinsic.Control.EndIf
+Program.Sub.Main.End
+
+Program.Sub.FormSD_UnLoad.Start
+f.Intrinsic.Control.Try
+V.Local.bRet.Declare(Boolean,False)
+
+F.Intrinsic.File.Exists(V.Global.sFile,V.Local.bRet)
+F.Intrinsic.Control.If(V.Local.bRet)
+	F.Intrinsic.File.DeleteFile(V.Global.sFile)
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.If(V.Global.bOpen)
+	F.ODBC.Connection!con.Close
+	V.Global.bOpen.Set(False)
+F.Intrinsic.Control.EndIf
+			
+F.Intrinsic.Control.End
+
+f.Intrinsic.Control.Catch
+	f.Intrinsic.Control.End
+f.Intrinsic.Control.EndTry
+Program.Sub.FormSD_UnLoad.End
+
+Program.Sub.cmdUpdate_Click.Start
+F.Intrinsic.Control.SetErrorHandler("Main_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String,"")
+V.Local.sRet.Declare(String,"")
+
+F.Intrinsic.File.File2String(V.Global.sFile,V.Local.sRet)
+F.Intrinsic.String.Split(v.Local.sRet,"|~|",V.Local.sRet)
+gui.FormSD.txtAltDesc.Text(V.Local.sRet(0).Trim)
+gui.FormSD.txtExtraDesc.Text(V.Local.sRet(1).Trim)
+Gui.FormSD..AlwaysOnTop(True)
+Gui.FormSD..AlwaysOnTop(False)
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("Main_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	f.Intrinsic.String.Build("Project: {0}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}GAB Version: {5}}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+	f.Intrinsic.UI.Msgbox(V.Local.sError)
+	f.Intrinsic.Control.If(V.Global.bOpen)
+		f.ODBC.Connection!con.close
+		V.Global.bOpen.Set(False)
+	f.Intrinsic.Control.EndIf
+	f.Intrinsic.Control.End
+f.Intrinsic.Control.EndIf
+Program.Sub.cmdUpdate_Click.End
